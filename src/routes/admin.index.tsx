@@ -155,7 +155,7 @@ function AdminDashboard() {
                 {customEvents[0] && (
                   <Activity dot="var(--success)" time="baru saja" text={<>Event baru <b className="text-primary">{customEvents[0].title}</b> ditambahkan oleh {admin?.name}</>} />
                 )}
-                <Activity dot="var(--success)" time="5 mnt" text={<>Tiket <b className="text-primary">Neon Dynasty</b> B-07 berhasil terjual ke Andi S.</>} />
+                <Activity dot="var(--success)" time="5 mnt" text={<>Tiket <b className="text-primary">Neon Dynasty</b> B-07 berhasil terjual ke Starlie.</>} />
                 <Activity dot="var(--warning)" time="8 mnt" text={<>User <b className="text-primary">user_3341</b> mengunci kursi <b className="text-primary">C-09</b> Frozen Horizon</>} />
                 <Activity dot="var(--destructive)" time="45 mnt" text={<>Transaksi <b className="text-primary">TW-00417</b> gagal — timeout pembayaran</>} />
                 <Activity dot="#60a5fa" time="1 j" text={<>Event baru <b className="text-primary">Solar Bloom</b> ditambahkan oleh admin</>} />
