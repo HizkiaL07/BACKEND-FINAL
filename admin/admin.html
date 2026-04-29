@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TicketWave – Admin Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="admin-style.css">
+</head>
+<body>
+<div class="bg-mesh"></div>
+<div class="bg-grid"></div>
+
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">Ticket<span>Wave</span></div>
+      <div class="logo-sub">Admin Panel</div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <div class="nav-item active" onclick="navigate('dashboard',this)">
+        <span class="nav-icon">📊</span>
+        <span>Dashboard</span>
+      </div>
+
+      <div class="nav-section-label">Manajemen</div>
+      <div class="nav-item" onclick="navigate('events',this)">
+        <span class="nav-icon">🎤</span>
+        <span>Kelola Event</span>
+        <span class="nav-badge" id="badge-event">6</span>
+      </div>
+      <div class="nav-item" onclick="navigate('seats',this)">
+        <span class="nav-icon">🪑</span>
+        <span>Status Kursi</span>
+      </div>
+      <div class="nav-item" onclick="navigate('orders',this)">
+        <span class="nav-icon">🎟️</span>
+        <span>Pesanan</span>
+        <span class="nav-badge" id="badge-order">3</span>
+      </div>
+
+      <div class="nav-section-label">Laporan</div>
+      <div class="nav-item" onclick="navigate('reports',this)">
+        <span class="nav-icon">📈</span>
+        <span>Laporan Penjualan</span>
+      </div>
+
+      <div class="nav-section-label">Sistem</div>
+      <div class="nav-item" onclick="navigate('settings',this)">
+        <span class="nav-icon">⚙️</span>
+        <span>Pengaturan</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-user">
+      <div class="user-avatar">AD</div>
+      <div class="user-info">
+        <div class="user-name">Admin TicketWave</div>
+        <div class="user-role">Super Admin</div>
+      </div>
+      <button class="btn-logout" title="Logout" onclick="showToast('Logout berhasil!','success')">⏻</button>
+    </div>
+  </aside>
+
+  <div class="main">
+
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">DASHBOARD <span>ADMIN</span></div>
+      <div class="topbar-right">
+        <span class="topbar-date" id="topbar-date"></span>
+        <button class="btn-ghost" onclick="showToast('Notifikasi tidak ada yang baru.','')">🔔</button>
+        <button class="btn-primary" id="topbar-cta" onclick="openModal()">＋ Tambah Event</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <div class="view active" id="view-dashboard">
+
+        <div class="stat-grid">
+          <div class="stat-card" style="--card-accent:var(--accent)">
+            <div class="stat-card-header">
+              <span class="stat-card-label">Total Tiket Terjual</span>
+              <span class="stat-card-icon">🎟️</span>
+            </div>
+            <div class="stat-card-value">12<em>K+</em></div>
+            <div class="stat-card-change"><span class="up">↑ 18%</span> vs bulan lalu</div>
+            <div class="stat-bg-icon">🎟️</div>
+          </div>
+          <div class="stat-card" style="--card-accent:var(--accent3)">
+            <div class="stat-card-header">
+              <span class="stat-card-label">Pendapatan</span>
+              <span class="stat-card-icon">💰</span>
+            </div>
+            <div class="stat-card-value">Rp<em>48</em>M</div>
+            <div class="stat-card-change"><span class="up">↑ 24%</span> vs bulan lalu</div>
+            <div class="stat-bg-icon">💰</div>
+          </div>
+          <div class="stat-card" style="--card-accent:var(--accent4)">
+            <div class="stat-card-header">
+              <span class="stat-card-label">Event Aktif</span>
+              <span class="stat-card-icon">🎤</span>
+            </div>
+            <div class="stat-card-value"><em>48</em></div>
+            <div class="stat-card-change"><span class="up">↑ 4</span> event baru pekan ini</div>
+            <div class="stat-bg-icon">🎤</div>
+          </div>
+          <div class="stat-card" style="--card-accent:var(--accent2)">
+            <div class="stat-card-header">
+              <span class="stat-card-label">Kursi Locked Aktif</span>
+              <span class="stat-card-icon">🔒</span>
+            </div>
+            <div class="stat-card-value"><em>127</em></div>
+            <div class="stat-card-change"><span class="down">Real-time</span> – pembaruan otomatis</div>
+            <div class="stat-bg-icon">🔒</div>
+          </div>
+        </div>
+
+        <div class="two-col">
+
+          <div class="panel-box">
+            <div class="panel-box-header">
+              <span class="panel-box-title" style="color:var(--text)">🕐 Aktivitas Terbaru</span>
+              <button class="btn-ghost" style="font-size:.75rem;padding:5px 10px">Lihat Semua</button>
+            </div>
+            <div class="panel-box-body">
+              <div class="activity-feed" id="activity-feed"></div>
+            </div>
+          </div>
+
+          <div class="panel-box">
+            <div class="panel-box-header">
+              <span class="panel-box-title" style="color:var(--text)">🪑 Status Kursi Global</span>
+              <button class="btn-ghost" style="font-size:.75rem;padding:5px 10px" onclick="navigate('seats', document.querySelector('.nav-item:nth-child(5)'))">Detail</button>
+            </div>
+            <div class="panel-box-body">
+              <div class="seat-overview">
+                <div class="seat-donut">
+                  <svg width="100" height="100" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="12"/>
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="#ff4d6d" stroke-width="12"
+                      stroke-dasharray="75 164" stroke-dashoffset="0"/>
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="#f0c040" stroke-width="12"
+                      stroke-dasharray="30 164" stroke-dashoffset="-75"/>
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="#4dffb8" stroke-width="12"
+                      stroke-dasharray="59 164" stroke-dashoffset="-105"/>
+                  </svg>
+                  <div class="donut-label">
+                    <div class="donut-pct">76%</div>
+                    <div class="donut-sub">Terisi</div>
+                  </div>
+                </div>
+                <div class="seat-legend">
+                  <div class="legend-item"><div class="legend-dot" style="background:#ff4d6d"></div>Terjual<span class="legend-count">9,240</span></div>
+                  <div class="legend-item"><div class="legend-dot" style="background:#f0c040"></div>Locked<span class="legend-count">127</span></div>
+                  <div class="legend-item"><div class="legend-dot" style="background:#4dffb8"></div>Tersedia<span class="legend-count">2,833</span></div>
+                </div>
+              </div>
+
+              <div style="margin-top:20px">
+                <div style="font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Penjualan 7 Hari</div>
+                <div class="bar-chart" id="mini-bar-chart"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-header" style="margin-bottom:14px">
+            <span class="section-title">Event <span>Terpopuler</span></span>
+            <button class="btn-ghost" style="font-size:.78rem" onclick="navigate('events', document.querySelector('.nav-item:nth-child(4)'))">Lihat Semua →</button>
+          </div>
+          <div class="table-wrap">
+            <table id="dashboard-event-table">
+              <thead>
+                <tr>
+                  <th>Event</th>
+                  <th>Tanggal</th>
+                  <th>Status</th>
+                  <th>Tiket Terjual</th>
+                  <th>Pendapatan</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-event-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><div class="view" id="view-events">
+        <div class="section-header">
+          <span class="section-title">Kelola <span>Event</span></span>
+          <button class="btn-primary" onclick="openModal()">＋ Tambah Event Baru</button>
+        </div>
+        <div class="table-wrap">
+          <div class="table-filters">
+            <div class="search-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="text" placeholder="Cari event atau artis..." id="event-search" oninput="filterEvents()">
+            </div>
+            <select class="filter-select" id="event-status-filter" onchange="filterEvents()">
+              <option value="">Semua Status</option>
+              <option value="active">Aktif</option>
+              <option value="soon">Segera</option>
+              <option value="sold">Sold Out</option>
+              <option value="draft">Draft</option>
+            </select>
+            <button class="btn-ghost" onclick="showToast('Mengekspor data…','')">⬇ Export CSV</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Tanggal</th>
+                <th>Venue</th>
+                <th>Kapasitas</th>
+                <th>Terjual</th>
+                <th>Harga Mulai</th>
+                <th>Status</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="event-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="view" id="view-seats">
+        <div class="section-header">
+          <span class="section-title">Status <span>Kursi</span> Real-Time</span>
+          <button class="btn-ghost" onclick="randomizeSeatMap()">🔄 Simulasi Update</button>
+        </div>
+        <div class="seat-map-container">
+          <div class="seat-map-header">
+            <div class="event-select-bar" style="flex:1;margin:0">
+              <select class="filter-select" id="seat-event-select" onchange="renderSeatMap()">
+                <option value="0">NEON DYNASTY TOUR — Jakarta Arena</option>
+                <option value="1">SCARLET STORM FEST — Bandung</option>
+                <option value="2">FROZEN HORIZON — Surabaya Convention</option>
+              </select>
+            </div>
+            <div class="seat-map-legend">
+              <div class="seat-legend-item"><div class="seat-swatch" style="background:#2a4a2a;border:1px solid #3a7a3a"></div> Tersedia</div>
+              <div class="seat-legend-item"><div class="seat-swatch" style="background:#3a3a1a;border:1px solid #7a7a2a"></div> Locked</div>
+              <div class="seat-legend-item"><div class="seat-swatch" style="background:#2a1a1a;border:1px solid #5a2020"></div> Terjual</div>
+            </div>
+          </div>
+          <div class="seat-map-body">
+            <div class="stage-label">▲ &nbsp; PANGGUNG &nbsp; ▲</div>
+            <div class="seat-grid-wrap">
+              <div class="seat-grid" id="seat-grid"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="panel-box">
+            <div class="panel-box-header"><span class="panel-box-title" style="color:var(--text)">📊 Statistik Kursi Event Ini</span></div>
+            <div class="panel-box-body">
+              <div class="seat-overview">
+                <div class="seat-donut" id="seat-donut-wrap">
+                  <svg width="100" height="100" viewBox="0 0 100 100" id="seat-donut-svg">
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="12"/>
+                    <circle id="donut-sold" cx="50" cy="50" r="38" fill="none" stroke="#ff4d6d" stroke-width="12" stroke-dasharray="0 239"/>
+                    <circle id="donut-locked" cx="50" cy="50" r="38" fill="none" stroke="#f0c040" stroke-width="12" stroke-dasharray="0 239"/>
+                    <circle id="donut-avail" cx="50" cy="50" r="38" fill="none" stroke="#4dffb8" stroke-width="12" stroke-dasharray="0 239"/>
+                  </svg>
+                  <div class="donut-label">
+                    <div class="donut-pct" id="seat-pct">0%</div>
+                    <div class="donut-sub">Terisi</div>
+                  </div>
+                </div>
+                <div class="seat-legend">
+                  <div class="legend-item"><div class="legend-dot" style="background:#ff4d6d"></div>Terjual<span class="legend-count" id="count-sold">0</span></div>
+                  <div class="legend-item"><div class="legend-dot" style="background:#f0c040"></div>Locked<span class="legend-count" id="count-locked">0</span></div>
+                  <div class="legend-item"><div class="legend-dot" style="background:#4dffb8"></div>Tersedia<span class="legend-count" id="count-avail">0</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="panel-box">
+            <div class="panel-box-header"><span class="panel-box-title" style="color:var(--text)">🔒 Seat Locking Log</span></div>
+            <div class="panel-box-body">
+              <div class="activity-feed" id="lock-log">
+                <div class="activity-item"><div class="activity-dot" style="background:#f0c040"></div><div class="activity-text">User <em>user_8821</em> mengunci kursi <em>B-07</em></div><span class="activity-time">2d lalu</span></div>
+                <div class="activity-item"><div class="activity-dot" style="background:#ff4d6d"></div><div class="activity-text">Kursi <em>C-12</em> terjual ke <em>Budi S.</em></div><span class="activity-time">3d lalu</span></div>
+                <div class="activity-item"><div class="activity-dot" style="background:#6b6b80"></div><div class="activity-text">Lock kursi <em>A-03</em> kedaluwarsa (5 menit)</div><span class="activity-time">3d lalu</span></div>
+                <div class="activity-item"><div class="activity-dot" style="background:#4dffb8"></div><div class="activity-text">Kursi <em>D-05</em> dibuka kembali (timeout)</div><span class="activity-time">4d lalu</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="view" id="view-orders">
+        <div class="section-header">
+          <span class="section-title">Daftar <span>Pesanan</span></span>
+          <button class="btn-ghost">⬇ Export</button>
+        </div>
+        <div class="table-wrap">
+          <div class="table-filters">
+            <div class="search-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="text" placeholder="Cari nama / kode pesanan...">
+            </div>
+            <select class="filter-select">
+              <option>Semua Status</option>
+              <option>Berhasil</option>
+              <option>Menunggu</option>
+              <option>Gagal</option>
+            </select>
+          </div>
+          <table>
+            <thead><tr><th>#</th><th>Nama Pembeli</th><th>Event</th><th>Kursi</th><th>Total</th><th>Metode</th><th>Status</th><th>Waktu</th></tr></thead>
+            <tbody id="order-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="view" id="view-reports">
+        <div class="section-header">
+          <span class="section-title">Laporan <span>Penjualan</span></span>
+          <div style="display:flex;gap:8px">
+            <select class="filter-select"><option>7 Hari</option><option>30 Hari</option><option>3 Bulan</option></select>
+            <button class="btn-ghost">⬇ Export PDF</button>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card" style="--card-accent:var(--accent)"><div class="stat-card-header"><span class="stat-card-label">Gross Revenue</span><span class="stat-card-icon">💹</span></div><div class="stat-card-value">Rp<em>48</em>M</div><div class="stat-card-change"><span class="up">↑ 24%</span></div><div class="stat-bg-icon">💹</div></div>
+          <div class="stat-card" style="--card-accent:var(--accent3)"><div class="stat-card-header"><span class="stat-card-label">Tiket Terjual</span><span class="stat-card-icon">🎟️</span></div><div class="stat-card-value"><em>12</em>K</div><div class="stat-card-change"><span class="up">↑ 18%</span></div><div class="stat-bg-icon">🎟️</div></div>
+          <div class="stat-card" style="--card-accent:var(--accent4)"><div class="stat-card-header"><span class="stat-card-label">Avg. Ticket Price</span><span class="stat-card-icon">🏷️</span></div><div class="stat-card-value">Rp<em>4</em>M</div><div class="stat-card-change"><span class="up">↑ 5%</span></div><div class="stat-bg-icon">🏷️</div></div>
+          <div class="stat-card" style="--card-accent:var(--accent2)"><div class="stat-card-header"><span class="stat-card-label">Transaksi Gagal</span><span class="stat-card-icon">⚠️</span></div><div class="stat-card-value"><em>38</em></div><div class="stat-card-change"><span class="down">↓ 3%</span> (membaik)</div><div class="stat-bg-icon">⚠️</div></div>
+        </div>
+        <div class="panel-box">
+          <div class="panel-box-header"><span class="panel-box-title" style="color:var(--text)">📊 Grafik Pendapatan Harian</span></div>
+          <div class="panel-box-body">
+            <div id="report-chart" style="height:140px;display:flex;align-items:flex-end;gap:10px;padding-top:10px"></div>
+            <div id="report-chart-labels" style="display:flex;gap:10px;margin-top:8px"></div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="panel-box-header" style="padding:14px 20px"><span class="panel-box-title" style="color:var(--text);font-size:1rem">Top Event by Revenue</span></div>
+          <table>
+            <thead><tr><th>#</th><th>Event</th><th>Tiket Terjual</th><th>Revenue</th><th>Share</th></tr></thead>
+            <tbody id="report-event-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="view" id="view-settings">
+        <div class="section-title" style="margin-bottom:4px">Pengaturan <span style="color:var(--accent)">Sistem</span></div>
+        <p style="color:var(--muted);font-size:.85rem">Konfigurasi platform TicketWave.</p>
+        <div class="panel-box">
+          <div class="panel-box-header"><span class="panel-box-title" style="color:var(--text)">🔒 Seat Lock Duration</span></div>
+          <div class="panel-box-body" style="display:flex;flex-direction:column;gap:16px">
+            <div class="field"><label>Durasi Lock (menit)</label><input type="number" value="5" min="1" max="30"></div>
+            <div class="field"><label>Maksimal Lock per User</label><input type="number" value="4" min="1" max="10"></div>
+            <button class="btn-primary" onclick="showToast('✅ Pengaturan disimpan!','success')">Simpan</button>
+          </div>
+        </div>
+        <div class="panel-box">
+          <div class="panel-box-header"><span class="panel-box-title" style="color:var(--text)">📧 Notifikasi Email</span></div>
+          <div class="panel-box-body" style="display:flex;flex-direction:column;gap:16px">
+            <div class="field"><label>Email Admin</label><input type="email" value="admin@ticketwave.id"></div>
+            <div class="field"><label>Kirim Notifikasi Saat</label>
+              <select>
+                <option>Tiket Terjual</option>
+                <option>Transaksi Gagal</option>
+                <option>Event Sold Out</option>
+              </select>
+            </div>
+            <button class="btn-primary" onclick="showToast('✅ Pengaturan email disimpan!','success')">Simpan</button>
+          </div>
+        </div>
+      </div>
+
+    </div></div></div><div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">TAMBAH EVENT BARU</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field"><label>Nama Event / Konser</label><input type="text" id="m-name" placeholder="Neon Dynasty Tour 2025"></div>
+        <div class="field"><label>Nama Artis</label><input type="text" id="m-artist" placeholder="Artis / Band"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Tanggal</label><input type="date" id="m-date"></div>
+        <div class="field"><label>Waktu</label><input type="time" id="m-time" value="19:00"></div>
+      </div>
+      <div class="field"><label>Venue / Lokasi</label><input type="text" id="m-venue" placeholder="Jakarta International Expo"></div>
+      <div class="field-row">
+        <div class="field"><label>Kapasitas Kursi</label><input type="number" id="m-cap" placeholder="500" min="1"></div>
+        <div class="field"><label>Harga Mulai (Rp)</label><input type="number" id="m-price" placeholder="250000" min="0"></div>
+      </div>
+      <div class="field"><label>Deskripsi (opsional)</label><textarea id="m-desc" placeholder="Deskripsi singkat event..."></textarea></div>
+      <div class="field">
+        <label>Status</label>
+        <select id="m-status">
+          <option value="draft">Draft</option>
+          <option value="active">Aktif</option>
+          <option value="soon">Segera</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn-primary" onclick="saveEvent()">✓ Simpan Event</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-modal" id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-icon">🗑️</div>
+    <div class="confirm-title">HAPUS EVENT?</div>
+    <div class="confirm-desc" id="confirm-desc">Tindakan ini tidak dapat dibatalkan. Semua data tiket dan kursi terkait juga akan dihapus.</div>
+    <div class="confirm-actions">
+      <button class="btn-ghost" onclick="closeConfirm()">Batal</button>
+      <button class="btn-danger" onclick="confirmDelete()">Ya, Hapus</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="admin-script.js"></script>
+</body>
+</html>
