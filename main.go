@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
@@ -29,8 +30,8 @@ func main() {
 	// 2b. Seed default menus jika belum ada
 	seedDefaultMenus(db)
 	
-	// 2c. Seed default events dan tickets jika belum ada
-	seedDefaultEvents(db)
+	// 2c. Seed default admin
+	seedDefaultAdmin()
 
 	// 3. Setup Router
 	r := SetupRouter()
@@ -92,12 +93,12 @@ func SetupRouter() *gin.Engine {
 user := r.Group("/api")
 user.Use(middleware.AuthMiddleware())
 {
-    // User Profile - TAMBAHKAN INI
+   // User Profile
     user.GET("/profile", handlers.GetUserProfile) 
+    user.PUT("/profile", handlers.UpdateProfile)
 
-	user.PUT("/profile", handlers.UpdateProfile)
-
-    // Transactions
+    // Transactions - PERBAIKAN DI SINI
+    // Gunakan 'user' (bukan router) dan path cukup 'checkout'
     user.POST("/checkout", handlers.CreateTransaction)
     
     // Untuk My Tickets
@@ -368,4 +369,36 @@ func seedDefaultEvents(db interface{}) {
 	}
 	
 	fmt.Printf("✅ Berhasil seed %d default tickets\n", len(defaultTickets))
+}
+
+// seedDefaultAdmin - Membuat akun admin default jika belum ada
+func seedDefaultAdmin() {
+	var count int64
+	database.DB.Model(&models.User{}).Where("role = ?", "admin").Count(&count)
+	
+	if count > 0 {
+		return // Admin sudah ada, skip seeding
+	}
+	
+	fmt.Println("🌱 Seeding default admin...")
+	
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+	if err != nil {
+		fmt.Println("❌ Gagal enkripsi password admin:", err)
+		return
+	}
+
+	admin := models.User{
+		FullName: "Kiaa Admin",
+		Email:    "pokoknyaadmin@gmail.com",
+		Password: string(hashedPassword),
+		Role:     "admin",
+	}
+
+	if result := database.DB.Create(&admin); result.Error != nil {
+		fmt.Println("❌ Gagal seed default admin:", result.Error)
+		return
+	}
+	
+	fmt.Println("✅ Berhasil seed default admin (pokoknyaadmin@gmail.com)")
 }

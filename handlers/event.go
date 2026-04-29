@@ -191,7 +191,7 @@ func UpdateEvent(c *gin.Context) {
 		event.Status = input.Status
 	}
 	if input.EventDate != "" {
-		parsedDate, err := time.Parse("2006-01-02T15:04:05Z", input.EventDate)
+		parsedDate, err := time.Parse(time.RFC3339, input.EventDate)
 		if err != nil {
 			parsedDate, _ = time.Parse("2006-01-02 15:04:05", input.EventDate)
 		}
@@ -229,6 +229,24 @@ func DeleteEvent(c *gin.Context) {
 		c.JSON(http.StatusForbidden, Response{
 			Success: false,
 			Message: "Hanya admin yang dapat menghapus event",
+		})
+		return
+	}
+
+	// Hapus transaksi terkait terlebih dahulu
+	if result := database.DB.Where("event_id = ?", eventID).Delete(&models.Transaction{}); result.Error != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Success: false,
+			Message: "Gagal menghapus transaksi terkait",
+		})
+		return
+	}
+
+	// Hapus tiket terkait terlebih dahulu untuk menghindari foreign key constraint error
+	if result := database.DB.Where("event_id = ?", eventID).Delete(&models.Ticket{}); result.Error != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Success: false,
+			Message: "Gagal menghapus tiket terkait",
 		})
 		return
 	}

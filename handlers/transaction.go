@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -21,6 +22,9 @@ var LockDuration = 10 * time.Minute
 func CreateTransaction(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 
+	// Debugging logs added to trace issues
+	log.Printf("User ID: %v", userID)
+
 	var input struct {
 		EventID  uint `json:"event_id" binding:"required"`
 		TicketID uint `json:"ticket_id" binding:"required"`
@@ -28,6 +32,7 @@ func CreateTransaction(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
+		log.Printf("Invalid input: %v", err)
 		c.JSON(http.StatusBadRequest, Response{
 			Success: false,
 			Message: "Validasi gagal: " + err.Error(),
@@ -35,8 +40,11 @@ func CreateTransaction(c *gin.Context) {
 		return
 	}
 
+	log.Printf("Input received: %+v", input)
+
 	var ticket models.Ticket
 	if result := database.DB.First(&ticket, input.TicketID); result.Error != nil {
+		log.Printf("Ticket not found: %v", result.Error)
 		c.JSON(http.StatusNotFound, Response{
 			Success: false,
 			Message: "Ticket tidak ditemukan",
@@ -44,7 +52,10 @@ func CreateTransaction(c *gin.Context) {
 		return
 	}
 
+	log.Printf("Ticket found: %+v", ticket)
+
 	if ticket.EventID != input.EventID {
+		log.Printf("Ticket mismatch: Ticket EventID %v, Input EventID %v", ticket.EventID, input.EventID)
 		c.JSON(http.StatusBadRequest, Response{
 			Success: false,
 			Message: "Ticket tidak cocok dengan event",
@@ -53,6 +64,7 @@ func CreateTransaction(c *gin.Context) {
 	}
 
 	if ticket.AvailableSeats < input.Quantity {
+		log.Printf("Insufficient seats: Available %v, Requested %v", ticket.AvailableSeats, input.Quantity)
 		c.JSON(http.StatusBadRequest, Response{
 			Success: false,
 			Message: fmt.Sprintf("Kursi tidak cukup. Tersedia: %d, Diminta: %d", ticket.AvailableSeats, input.Quantity),
@@ -60,6 +72,7 @@ func CreateTransaction(c *gin.Context) {
 		return
 	}
 
+	log.Printf("Seats available. Proceeding with transaction.")
 	ticket.AvailableSeats -= input.Quantity
 	database.DB.Save(&ticket)
 
@@ -76,6 +89,7 @@ func CreateTransaction(c *gin.Context) {
 	}
 
 	if result := database.DB.Create(&transaction); result.Error != nil {
+		log.Printf("Transaction creation failed: %v", result.Error)
 		ticket.AvailableSeats += input.Quantity
 		database.DB.Save(&ticket)
 		c.JSON(http.StatusInternalServerError, Response{
@@ -84,6 +98,8 @@ func CreateTransaction(c *gin.Context) {
 		})
 		return
 	}
+
+	log.Printf("Transaction created successfully: %+v", transaction)
 
 	c.JSON(http.StatusCreated, Response{
 		Success: true,
