@@ -5,26 +5,33 @@ import (
 )
 
 type User struct {
-    ID        uint      `gorm:"primaryKey" json:"id"`
-    FullName  string    `gorm:"size:100;not null" json:"full_name"` // Konsisten pakai FullName
-    Email     string    `gorm:"size:100;uniqueIndex;not null" json:"email"`
-    Password  string    `gorm:"not null" json:"-"` // Password tetap disimpan tapi tidak akan tampil di API
-    Role      string    `gorm:"size:20;default:user" json:"role"`
-    CreatedAt time.Time `json:"created_at"`
-    UpdatedAt time.Time `json:"updated_at"`
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	FullName    string    `gorm:"size:100;not null" json:"full_name"`
+	Username    string    `gorm:"size:50;uniqueIndex" json:"username"`
+	Email       string    `gorm:"size:100;uniqueIndex;not null" json:"email"`
+	Password    string    `gorm:"not null" json:"-"`
+	PhoneNumber string    `gorm:"size:20" json:"phone_number"`
+	Address     string    `gorm:"type:text" json:"address"`
+	AvatarURL   string    `gorm:"size:255" json:"avatar_url"`
+	Role        string    `gorm:"size:20;default:user" json:"role"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 
-    // RELASI: Ini yang bikin kita bisa lihat riwayat tiket per user
-    Transactions []Transaction `gorm:"foreignKey:UserID" json:"transactions,omitempty"`
+	// RELASI: Ini yang bikin kita bisa lihat riwayat tiket per user
+	Transactions []Transaction `gorm:"foreignKey:UserID" json:"transactions,omitempty"`
 }
 
 // Event Model
 type Event struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	Title       string    `gorm:"size:200;not null" json:"title"`
+	Artist      string    `gorm:"size:100" json:"artist"`
+	Genre       string    `gorm:"size:50" json:"genre"`
 	Description string    `gorm:"type:text" json:"description"`
 	EventDate   time.Time `gorm:"not null" json:"event_date"`
 	Location    string    `gorm:"size:200;not null" json:"location"`
 	ImageURL    string    `gorm:"size:255" json:"image_url"`
+	Rating      float64   `gorm:"type:decimal(3,1);default:0" json:"rating"`
 	Status      string    `gorm:"size:20;default:active" json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -59,7 +66,7 @@ type Transaction struct {
 
 	// RELASI: Ini bagian yang sangat krusial agar Preload() bekerja
 	User   User   `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Event  Event  `gorm:"foreignKey:EventID" json:"event"`  // Jangan pakai omitempty agar selalu muncul di detail tiket
+	Event  Event  `gorm:"foreignKey:EventID" json:"event"`   // Jangan pakai omitempty agar selalu muncul di detail tiket
 	Ticket Ticket `gorm:"foreignKey:TicketID" json:"ticket"` // Jangan pakai omitempty
 }
 
@@ -73,7 +80,7 @@ type Menu struct {
 	Order     int       `gorm:"default:0" json:"order"`
 	Role      string    `gorm:"size:20;default:public" json:"role"` // public, user, admin
 	IsActive  bool      `gorm:"default:true" json:"is_active"`
-	ParentID  *uint     `gorm:"null" json:"parent_id"`               // untuk submenu
+	ParentID  *uint     `gorm:"null" json:"parent_id"` // untuk submenu
 	Parent    *Menu     `gorm:"foreignKey:ParentID" json:"parent,omitempty"`
 	Children  []Menu    `gorm:"foreignKey:ParentID" json:"children,omitempty"`
 	CreatedAt time.Time `json:"created_at"`

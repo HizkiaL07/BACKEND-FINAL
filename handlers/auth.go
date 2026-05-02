@@ -1,7 +1,11 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"ticketing-backend/database"
@@ -15,7 +19,7 @@ import (
 // JWT Secret Key - Dalam production, simpan di environment variable
 var jwtSecret = []byte("ticketwave_secret_key_2024")
 
-// Catatan: type Response sudah dihapus dari sini karena 
+// Catatan: type Response sudah dihapus dari sini karena
 // sudah dideklarasikan di handlers/transaction.go
 
 // ========== USER HANDLERS ==========
@@ -57,8 +61,12 @@ func RegisterUser(c *gin.Context) {
 	}
 
 	// Buat user baru (Menggunakan FullName sesuai Model)
+	baseUsername := strings.Split(input.Email, "@")[0]
+	generatedUsername := fmt.Sprintf("%s_%d", baseUsername, time.Now().Unix())
+
 	newUser := models.User{
 		FullName: input.Name, // input.Name dipetakan ke FullName
+		Username: generatedUsername,
 		Email:    input.Email,
 		Password: string(hashedPassword),
 		Role:     "user",
@@ -141,10 +149,11 @@ func LoginUser(c *gin.Context) {
 		Data: gin.H{
 			"token": tokenString,
 			"user": gin.H{
-				"id":    user.ID,
-				"name":  user.FullName,
-				"email": user.Email,
-				"role":  user.Role,
+				"id":       user.ID,
+				"name":     user.FullName,
+				"username": user.Username,
+				"email":    user.Email,
+				"role":     user.Role,
 			},
 		},
 	})
@@ -161,9 +170,13 @@ func UpdateProfile(c *gin.Context) {
 
 	// 2. Struct untuk menerima input dari Frontend
 	var input struct {
-		FullName string `json:"full_name"`
-		Email    string `json:"email"`
-		Password string `json:"password"` // Kita terima password di sini
+		FullName    string `json:"full_name"`
+		Username    string `json:"username"`
+		Email       string `json:"email"`
+		Password    string `json:"password"`
+		PhoneNumber string `json:"phone_number"`
+		Address     string `json:"address"`
+		AvatarURL   string `json:"avatar_url"`
 	}
 
 	// 3. Bind JSON
@@ -194,19 +207,39 @@ func UpdateProfile(c *gin.Context) {
 		user.Email = input.Email
 	}
 
+	// 6b. Update Username jika diisi & cek duplikat
+	if input.Username != "" && input.Username != user.Username {
+		var duplicate models.User
+		if err := database.DB.Where("username = ?", input.Username).First(&duplicate).Error; err == nil {
+			c.JSON(http.StatusConflict, Response{Success: false, Message: "Username sudah digunakan"})
+			return
+		}
+		user.Username = input.Username
+	}
+
 	// 7. Update Password jika diisi (Min. 6 karakter)
 	if input.Password != "" {
 		if len(input.Password) < 6 {
 			c.JSON(http.StatusBadRequest, Response{Success: false, Message: "Password minimal 6 karakter"})
 			return
 		}
-		// Enkripsi password baru
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, Response{Success: false, Message: "Gagal memproses password"})
 			return
 		}
 		user.Password = string(hashedPassword)
+	}
+
+	// Update field tambahan
+	if input.PhoneNumber != "" {
+		user.PhoneNumber = input.PhoneNumber
+	}
+	if input.Address != "" {
+		user.Address = input.Address
+	}
+	if input.AvatarURL != "" {
+		user.AvatarURL = input.AvatarURL
 	}
 
 	// 8. Simpan semua perubahan ke database
@@ -220,10 +253,41 @@ func UpdateProfile(c *gin.Context) {
 		Success: true,
 		Message: "Profil dan keamanan berhasil diperbarui!",
 		Data: gin.H{
-			"id":        user.ID,
-			"full_name": user.FullName,
-			"email":     user.Email,
+			"id":           user.ID,
+			"full_name":    user.FullName,
+			"username":     user.Username,
+			"email":        user.Email,
+			"phone_number": user.PhoneNumber,
+			"address":      user.Address,
+			"avatar_url":   user.AvatarURL,
 		},
+	})
+}
+
+// UploadAvatar - mengupload foto profil user
+func UploadAvatar(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	file, err := c.FormFile("avatar")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Message: "File avatar tidak ditemukan"})
+		return
+	}
+
+	filename := strconv.FormatUint(uint64(userID.(uint)), 10) + "_" + time.Now().Format("20060102150405") + "_" + file.Filename
+	filepath := "uploads/avatars/" + filename
+
+	if err := c.SaveUploadedFile(file, filepath); err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Success: false, Message: "Gagal menyimpan file"})
+		return
+	}
+
+	avatarURL := "/uploads/avatars/" + filename
+	database.DB.Model(&models.User{}).Where("id = ?", userID).Update("avatar_url", avatarURL)
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Message: "Foto profil berhasil diupdate",
+		Data:    avatarURL,
 	})
 }
 
@@ -245,7 +309,9 @@ func LoginAdmin(c *gin.Context) {
 	}
 
 	var admin models.User
+	log.Printf("Admin login attempt: Email=%s", input.Email)
 	if result := database.DB.Where("email = ? AND role = ?", input.Email, "admin").First(&admin); result.Error != nil {
+		log.Printf("Admin login failed: User not found or not an admin. Error: %v", result.Error)
 		c.JSON(http.StatusUnauthorized, Response{
 			Success: false,
 			Message: "Akses ditolak atau akun bukan admin",
@@ -254,12 +320,14 @@ func LoginAdmin(c *gin.Context) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(input.Password)); err != nil {
+		log.Printf("Admin login failed: Password mismatch for Email=%s", input.Email)
 		c.JSON(http.StatusUnauthorized, Response{
 			Success: false,
 			Message: "Email atau password salah",
 		})
 		return
 	}
+	log.Printf("Admin login successful: Email=%s", input.Email)
 
 	claims := jwt.MapClaims{
 		"user_id": admin.ID,
@@ -285,11 +353,33 @@ func LoginAdmin(c *gin.Context) {
 		Data: gin.H{
 			"token": tokenString,
 			"user": gin.H{
-				"id":    admin.ID,
-				"name":  admin.FullName,
-				"email": admin.Email,
-				"role":  admin.Role,
+				"id":       admin.ID,
+				"name":     admin.FullName,
+				"username": admin.Username,
+				"email":    admin.Email,
+				"role":     admin.Role,
 			},
 		},
+	})
+}
+
+// AdminGetAllUsers - mengambil semua user untuk admin (Admin only)
+func AdminGetAllUsers(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(http.StatusForbidden, Response{Success: false, Message: "Akses ditolak"})
+		return
+	}
+
+	var users []models.User
+	if err := database.DB.Find(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Success: false, Message: "Gagal mengambil data user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Message: "Daftar semua user",
+		Data:    users,
 	})
 }

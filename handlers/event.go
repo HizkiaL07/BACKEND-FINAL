@@ -16,12 +16,16 @@ import (
 // GetAllEvents - mengambil semua event yang aktif
 func GetAllEvents(c *gin.Context) {
 	var events []models.Event
-	
-	// Ambil event dengan status active dan event_date >= sekarang
-	if result := database.DB.Where("status = ? AND event_date >= ?", "active", time.Now()).
-		Preload("Tickets").
-		Order("event_date ASC").
-		Find(&events); result.Error != nil {
+	isAdmin := c.Query("admin") == "true"
+
+	query := database.DB.Preload("Tickets").Order("event_date ASC")
+
+	if !isAdmin {
+		// Jika bukan admin, hanya ambil event dengan status active dan event_date >= sekarang
+		query = query.Where("status = ? AND event_date >= ?", "active", time.Now())
+	}
+
+	if result := query.Find(&events); result.Error != nil {
 		c.JSON(http.StatusInternalServerError, Response{
 			Success: false,
 			Message: "Gagal mengambil data event: " + result.Error.Error(),
@@ -77,10 +81,14 @@ func CreateEvent(c *gin.Context) {
 
 	var input struct {
 		Title       string  `json:"title" binding:"required"`
+		Artist      string  `json:"artist"`
+		Genre       string  `json:"genre"`
 		Description string  `json:"description"`
 		EventDate   string  `json:"event_date" binding:"required"`
 		Location    string  `json:"location" binding:"required"`
 		ImageURL    string  `json:"image_url"`
+		Rating      float64 `json:"rating"`
+		Price       float64 `json:"price"` // Untuk buat tiket otomatis
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -92,24 +100,41 @@ func CreateEvent(c *gin.Context) {
 	}
 
 	// Parse tanggal event
-	parsedDate, err := time.Parse("2006-01-02T15:04:05Z", input.EventDate)
-	if err != nil {
-		parsedDate, err = time.Parse("2006-01-02 15:04:05", input.EventDate)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, Response{
-				Success: false,
-				Message: "Format tanggal tidak valid",
-			})
-			return
+	var parsedDate time.Time
+	var parseErr error
+
+	// Coba beberapa format populer
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05.000Z",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+	}
+
+	for _, f := range formats {
+		parsedDate, parseErr = time.Parse(f, input.EventDate)
+		if parseErr == nil {
+			break
 		}
+	}
+
+	if parseErr != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Success: false,
+			Message: "Format tanggal tidak valid: " + input.EventDate,
+		})
+		return
 	}
 
 	newEvent := models.Event{
 		Title:       input.Title,
+		Artist:      input.Artist,
+		Genre:       input.Genre,
 		Description: input.Description,
 		EventDate:   parsedDate,
 		Location:    input.Location,
 		ImageURL:    input.ImageURL,
+		Rating:      input.Rating,
 		Status:      "active",
 	}
 
@@ -119,6 +144,30 @@ func CreateEvent(c *gin.Context) {
 			Message: "Gagal membuat event: " + result.Error.Error(),
 		})
 		return
+	}
+
+	// Buat tiket default jika ada harga (VIP, Premium, Regular)
+	if input.Price > 0 {
+		categories := []struct {
+			Name  string
+			Mult  float64
+			Quota int
+		}{
+			{"VIP", 2.0, 100},
+			{"Premium", 1.5, 150},
+			{"Regular", 1.0, 200},
+		}
+
+		for _, cat := range categories {
+			ticket := models.Ticket{
+				EventID:        newEvent.ID,
+				Category:       cat.Name,
+				Price:          input.Price * cat.Mult,
+				Quota:          cat.Quota,
+				AvailableSeats: cat.Quota,
+			}
+			database.DB.Create(&ticket)
+		}
 	}
 
 	c.JSON(http.StatusCreated, Response{
@@ -158,12 +207,15 @@ func UpdateEvent(c *gin.Context) {
 	}
 
 	var input struct {
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		EventDate   string `json:"event_date"`
-		Location    string `json:"location"`
-		ImageURL    string `json:"image_url"`
-		Status      string `json:"status"`
+		Title       string  `json:"title"`
+		Artist      string  `json:"artist"`
+		Genre       string  `json:"genre"`
+		Description string  `json:"description"`
+		EventDate   string  `json:"event_date"`
+		Location    string  `json:"location"`
+		ImageURL    string  `json:"image_url"`
+		Rating      float64 `json:"rating"`
+		Status      string  `json:"status"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -178,6 +230,12 @@ func UpdateEvent(c *gin.Context) {
 	if input.Title != "" {
 		event.Title = input.Title
 	}
+	if input.Artist != "" {
+		event.Artist = input.Artist
+	}
+	if input.Genre != "" {
+		event.Genre = input.Genre
+	}
 	if input.Description != "" {
 		event.Description = input.Description
 	}
@@ -186,6 +244,9 @@ func UpdateEvent(c *gin.Context) {
 	}
 	if input.ImageURL != "" {
 		event.ImageURL = input.ImageURL
+	}
+	if input.Rating > 0 {
+		event.Rating = input.Rating
 	}
 	if input.Status != "" {
 		event.Status = input.Status
@@ -265,6 +326,36 @@ func DeleteEvent(c *gin.Context) {
 	})
 }
 
+// UploadEventPhoto - mengupload gambar foto event
+func UploadEventPhoto(c *gin.Context) {
+	file, err := c.FormFile("foto")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Success: false,
+			Message: "File foto tidak ditemukan",
+		})
+		return
+	}
+
+	// Buat folder uploads jika belum ada
+	filename := time.Now().Format("20060102150405") + "_" + file.Filename
+	filepath := "uploads/posters/" + filename
+
+	if err := c.SaveUploadedFile(file, filepath); err != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Success: false,
+			Message: "Gagal menyimpan file: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Message: "Foto berhasil diupload",
+		Data:    "/uploads/posters/" + filename,
+	})
+}
+
 // ========== TICKET HANDLERS ==========
 
 // GetTicketsByEvent - mengambil semua ticket untuk event tertentu
@@ -311,7 +402,7 @@ func CreateTicket(c *gin.Context) {
 		Category       string  `json:"category" binding:"required"`
 		Price          float64 `json:"price" binding:"required"`
 		Quota          int     `json:"quota" binding:"required"`
-		AvailableSeats int     `json:"available_quanseats" binding:"required"`
+		AvailableSeats int     `json:"available_seats" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {

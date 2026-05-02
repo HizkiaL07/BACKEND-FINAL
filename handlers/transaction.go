@@ -234,6 +234,15 @@ func CheckLockStatus(c *gin.Context) {
 // AdminGetAllTransactions - admin melihat semua transaksi
 func AdminGetAllTransactions(c *gin.Context) {
 	var transactions []models.Transaction
-	database.DB.Preload("User").Preload("Event").Preload("Ticket").Find(&transactions)
+	// Preload User, Event, dan Ticket agar data lengkap di dashboard admin
+	if result := database.DB.Preload("User").Preload("Event").Preload("Ticket").
+		Order("created_at DESC").
+		Find(&transactions); result.Error != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Success: false,
+			Message: "Gagal mengambil data transaksi: " + result.Error.Error(),
+		})
+		return
+	}
 	c.JSON(http.StatusOK, Response{Success: true, Data: transactions})
 }

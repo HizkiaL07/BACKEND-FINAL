@@ -26,17 +26,20 @@ func main() {
 		log.Fatal("❌ Gagal migrate tabel:", err)
 	}
 	fmt.Println("✅ Database migration berhasil")
-	
+
 	// 2b. Seed default menus jika belum ada
 	seedDefaultMenus(db)
-	
+
 	// 2c. Seed default admin
 	seedDefaultAdmin()
 
 	// 3. Setup Router
 	r := SetupRouter()
 
-	// 4. Menjalankan Server
+	// 4. Setup Static Files (Untuk akses gambar upload)
+	r.Static("/uploads", "./uploads")
+
+	// 5. Menjalankan Server
 	port := ":8080"
 	fmt.Printf("🚀 Server Ticketing berjalan di http://localhost%s\n", port)
 	log.Fatal(r.Run(port))
@@ -56,7 +59,7 @@ func SetupRouter() *gin.Engine {
 	}))
 
 	// ========== PUBLIC ROUTES ==========
-	
+
 	// Health Check
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -90,33 +93,34 @@ func SetupRouter() *gin.Engine {
 
 	// ========== PROTECTED ROUTES (User) ==========
 
-user := r.Group("/api")
-user.Use(middleware.AuthMiddleware())
-{
-   // User Profile
-    user.GET("/profile", handlers.GetUserProfile) 
-    user.PUT("/profile", handlers.UpdateProfile)
+	user := r.Group("/api")
+	user.Use(middleware.AuthMiddleware())
+	{
+		// User Profile
+		user.GET("/profile", handlers.GetUserProfile)
+		user.PUT("/profile", handlers.UpdateProfile)
+		user.POST("/profile/avatar", handlers.UploadAvatar) // Upload Avatar
 
-    // Transactions - PERBAIKAN DI SINI
-    // Gunakan 'user' (bukan router) dan path cukup 'checkout'
-    user.POST("/checkout", handlers.CreateTransaction)
-    
-    // Untuk My Tickets
-    user.GET("/transactions/my", handlers.GetUserTransactions)
+		// Transactions - PERBAIKAN DI SINI
+		// Gunakan 'user' (bukan router) dan path cukup 'checkout'
+		user.POST("/checkout", handlers.CreateTransaction)
 
-    // Untuk list transaksi umum
-    user.GET("/transactions", handlers.GetUserTransactions) 
+		// Untuk My Tickets
+		user.GET("/transactions/my", handlers.GetUserTransactions)
 
-    // Detail transaksi berdasarkan ID
-    user.GET("/transactions/:id", handlers.GetTransactionByID)
-    
-    user.POST("/transactions/:id/confirm", handlers.ConfirmTransaction)
-    user.POST("/transactions/:id/cancel", handlers.CancelTransaction)
-    user.GET("/transactions/:id/status", handlers.CheckLockStatus)
-}
+		// Untuk list transaksi umum
+		user.GET("/transactions", handlers.GetUserTransactions)
+
+		// Detail transaksi berdasarkan ID
+		user.GET("/transactions/:id", handlers.GetTransactionByID)
+
+		user.POST("/transactions/:id/confirm", handlers.ConfirmTransaction)
+		user.POST("/transactions/:id/cancel", handlers.CancelTransaction)
+		user.GET("/transactions/:id/status", handlers.CheckLockStatus)
+	}
 
 	// ========== ADMIN ROUTES ==========
-	
+
 	admin := r.Group("/api/admin")
 	admin.Use(middleware.AuthMiddleware())
 	admin.Use(func(c *gin.Context) {
@@ -134,6 +138,7 @@ user.Use(middleware.AuthMiddleware())
 	{
 		// Events (Admin)
 		admin.POST("/events", handlers.CreateEvent)
+		admin.POST("/events/upload", handlers.UploadEventPhoto) // Upload Photo
 		admin.PUT("/events/:id", handlers.UpdateEvent)
 		admin.DELETE("/events/:id", handlers.DeleteEvent)
 
@@ -143,6 +148,9 @@ user.Use(middleware.AuthMiddleware())
 
 		// Transactions (Admin)
 		admin.GET("/transactions", handlers.AdminGetAllTransactions)
+
+		// User Management (Admin)
+		admin.GET("/users", handlers.AdminGetAllUsers) // Lihat semua user
 
 		// Menu Management (Admin)
 		admin.POST("/menus", handlers.CreateMenu)
@@ -159,13 +167,13 @@ func seedDefaultMenus(db interface{}) {
 	// Cek apakah menu sudah ada
 	var count int64
 	database.DB.Model(&models.Menu{}).Count(&count)
-	
+
 	if count > 0 {
 		return // Menu sudah ada, skip seeding
 	}
-	
+
 	fmt.Println("🌱 Seeding default menus...")
-	
+
 	defaultMenus := []models.Menu{
 		// Public Menus
 		{
@@ -251,145 +259,156 @@ func seedDefaultMenus(db interface{}) {
 			IsActive: true,
 		},
 	}
-	
+
 	if result := database.DB.CreateInBatches(defaultMenus, 100); result.Error != nil {
 		fmt.Println("❌ Gagal seed default menus:", result.Error)
 		return
 	}
-	
+
 	fmt.Printf("✅ Berhasil seed %d default menus\n", len(defaultMenus))
 }
 
 // seedDefaultEvents - Membuat event dan ticket default jika belum ada
 func seedDefaultEvents(db interface{}) {
-	// Cek apakah event sudah ada
-	var count int64
-	database.DB.Model(&models.Event{}).Count(&count)
-	
-	if count > 0 {
-		return // Event sudah ada, skip seeding
+	// 1. Cek & Seed Events
+	var eventCount int64
+	database.DB.Model(&models.Event{}).Count(&eventCount)
+
+	if eventCount == 0 {
+		fmt.Println("🌱 Seeding default events...")
+		defaultEvents := []models.Event{
+			{
+				Title:       "Neon Dynasty",
+				Description: "Experience the futuristic beats of Kage Riku",
+				EventDate:   time.Date(2026, 6, 12, 19, 0, 0, 0, time.UTC),
+				Location:    "GBK Senayan, Jakarta",
+				ImageURL:    "https://via.placeholder.com/400x300?text=Neon+Dynasty",
+				Status:      "active",
+			},
+			{
+				Title:       "Frozen Horizon",
+				Description: "Chill vibes with Aurora Kirana's synthwave",
+				EventDate:   time.Date(2026, 6, 28, 20, 0, 0, 0, time.UTC),
+				Location:    "ICE BSD, Tangerang",
+				ImageURL:    "https://via.placeholder.com/400x300?text=Frozen+Horizon",
+				Status:      "active",
+			},
+			{
+				Title:       "Solar Bloom",
+				Description: "Indie Pop festival with Mira Sun",
+				EventDate:   time.Date(2026, 7, 5, 19, 0, 0, 0, time.UTC),
+				Location:    "Istora Senayan",
+				ImageURL:    "https://via.placeholder.com/400x300?text=Solar+Bloom",
+				Status:      "active",
+			},
+			{
+				Title:       "Midnight Drift",
+				Description: "Alternative Rock showcase featuring Reza Velvet",
+				EventDate:   time.Date(2026, 7, 19, 20, 0, 0, 0, time.UTC),
+				Location:    "JIExpo Kemayoran",
+				ImageURL:    "https://via.placeholder.com/400x300?text=Midnight+Drift",
+				Status:      "active",
+			},
+			{
+				Title:       "Echo Garden",
+				Description: "Dream Pop experience with Lila Sora",
+				EventDate:   time.Date(2026, 8, 2, 19, 30, 0, 0, time.UTC),
+				Location:    "Lapangan Banteng",
+				ImageURL:    "https://via.placeholder.com/400x300?text=Echo+Garden",
+				Status:      "active",
+			},
+			{
+				Title:       "Voltage Nights",
+				Description: "Electronic Dance Music festival with DJ Kairo",
+				EventDate:   time.Date(2026, 8, 16, 21, 0, 0, 0, time.UTC),
+				Location:    "Allianz Stadium",
+				ImageURL:    "https://via.placeholder.com/400x300?text=Voltage+Nights",
+				Status:      "active",
+			},
+		}
+
+		if result := database.DB.CreateInBatches(defaultEvents, 100); result.Error != nil {
+			fmt.Println("❌ Gagal seed default events:", result.Error)
+		} else {
+			fmt.Printf("✅ Berhasil seed %d default events\n", len(defaultEvents))
+		}
 	}
-	
-	fmt.Println("🌱 Seeding default events and tickets...")
-	
-	defaultEvents := []models.Event{
-		{
-			Title:       "Neon Dynasty",
-			Description: "Cyberpunk music experience with Kage Riku",
-			EventDate:   time.Date(2026, 6, 12, 20, 0, 0, 0, time.UTC),
-			Location:    "GBK Senayan, Jakarta",
-			ImageURL:    "https://via.placeholder.com/400x300?text=Neon+Dynasty",
-			Status:      "active",
-		},
-		{
-			Title:       "Frozen Horizon",
-			Description: "Synthwave concert by Aurora Kirana",
-			EventDate:   time.Date(2026, 6, 28, 20, 0, 0, 0, time.UTC),
-			Location:    "ICE BSD, Tangerang",
-			ImageURL:    "https://via.placeholder.com/400x300?text=Frozen+Horizon",
-			Status:      "active",
-		},
-		{
-			Title:       "Solar Bloom",
-			Description: "Indie Pop festival with Mira Sun",
-			EventDate:   time.Date(2026, 7, 5, 19, 0, 0, 0, time.UTC),
-			Location:    "Istora Senayan",
-			ImageURL:    "https://via.placeholder.com/400x300?text=Solar+Bloom",
-			Status:      "active",
-		},
-		{
-			Title:       "Midnight Drift",
-			Description: "Alternative Rock showcase featuring Reza Velvet",
-			EventDate:   time.Date(2026, 7, 19, 20, 0, 0, 0, time.UTC),
-			Location:    "JIExpo Kemayoran",
-			ImageURL:    "https://via.placeholder.com/400x300?text=Midnight+Drift",
-			Status:      "active",
-		},
-		{
-			Title:       "Echo Garden",
-			Description: "Dream Pop experience with Lila Sora",
-			EventDate:   time.Date(2026, 8, 2, 19, 30, 0, 0, time.UTC),
-			Location:    "Lapangan Banteng",
-			ImageURL:    "https://via.placeholder.com/400x300?text=Echo+Garden",
-			Status:      "active",
-		},
-		{
-			Title:       "Voltage Nights",
-			Description: "Electronic Dance Music festival with DJ Kairo",
-			EventDate:   time.Date(2026, 8, 16, 21, 0, 0, 0, time.UTC),
-			Location:    "Allianz Stadium",
-			ImageURL:    "https://via.placeholder.com/400x300?text=Voltage+Nights",
-			Status:      "active",
-		},
+
+	// 2. Cek & Seed Tickets (Penting jika event sudah ada tapi tiket belum ada)
+	var ticketCount int64
+	database.DB.Model(&models.Ticket{}).Count(&ticketCount)
+
+	if ticketCount == 0 {
+		fmt.Println("🌱 Seeding missing tickets for events...")
+		var events []models.Event
+		database.DB.Find(&events)
+
+		if len(events) > 0 {
+			defaultTickets := []models.Ticket{}
+			for _, event := range events {
+				// VIP tier
+				defaultTickets = append(defaultTickets, models.Ticket{
+					EventID:        event.ID,
+					Category:       "VIP",
+					Price:          1500000,
+					Quota:          100,
+					AvailableSeats: 100,
+				})
+				// Premium tier
+				defaultTickets = append(defaultTickets, models.Ticket{
+					EventID:        event.ID,
+					Category:       "Premium",
+					Price:          700000,
+					Quota:          150,
+					AvailableSeats: 150,
+				})
+				// Regular tier
+				defaultTickets = append(defaultTickets, models.Ticket{
+					EventID:        event.ID,
+					Category:       "Regular",
+					Price:          450000,
+					Quota:          200,
+					AvailableSeats: 200,
+				})
+			}
+
+			if result := database.DB.CreateInBatches(defaultTickets, 100); result.Error != nil {
+				fmt.Println("❌ Gagal seed default tickets:", result.Error)
+			} else {
+				fmt.Printf("✅ Berhasil seed %d default tickets\n", len(defaultTickets))
+			}
+		} else {
+			fmt.Println("⏭️ Tidak ada event untuk diberikan tiket.")
+		}
+	} else {
+		fmt.Println("⏭️ Tiket sudah terisi, skip seeding tiket.")
 	}
-	
-	if result := database.DB.CreateInBatches(defaultEvents, 100); result.Error != nil {
-		fmt.Println("❌ Gagal seed default events:", result.Error)
-		return
-	}
-	
-	fmt.Printf("✅ Berhasil seed %d default events\n", len(defaultEvents))
-	
-	// Seed tickets untuk setiap event
-	fmt.Println("🌱 Seeding default tickets...")
-	var events []models.Event
-	database.DB.Find(&events)
-	
-	defaultTickets := []models.Ticket{}
-	for _, event := range events {
-		// VIP tier
-		defaultTickets = append(defaultTickets, models.Ticket{
-			EventID: event.ID,
-			Category: "VIP",
-			Price: 1500000,
-			Quota: 100,
-			AvailableSeats: 100,
-		})
-		// Premium tier
-		defaultTickets = append(defaultTickets, models.Ticket{
-			EventID: event.ID,
-			Category: "Premium",
-			Price: 700000,
-			Quota: 150,
-			AvailableSeats: 150,
-		})
-		// Regular tier
-		defaultTickets = append(defaultTickets, models.Ticket{
-			EventID: event.ID,
-			Category: "Regular",
-			Price: 450000,
-			Quota: 200,
-			AvailableSeats: 200,
-		})
-	}
-	
-	if result := database.DB.CreateInBatches(defaultTickets, 100); result.Error != nil {
-		fmt.Println("❌ Gagal seed default tickets:", result.Error)
-		return
-	}
-	
-	fmt.Printf("✅ Berhasil seed %d default tickets\n", len(defaultTickets))
 }
 
-// seedDefaultAdmin - Membuat akun admin default jika belum ada
+// seedDefaultAdmin - Membuat akun admin default jika belum ada atau reset password jika sudah ada
 func seedDefaultAdmin() {
-	var count int64
-	database.DB.Model(&models.User{}).Where("role = ?", "admin").Count(&count)
-	
-	if count > 0 {
-		return // Admin sudah ada, skip seeding
-	}
-	
-	fmt.Println("🌱 Seeding default admin...")
-	
+	var admin models.User
+	result := database.DB.Where("email = ? AND role = ?", "pokoknyaadmin@gmail.com", "admin").First(&admin)
+
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
 	if err != nil {
 		fmt.Println("❌ Gagal enkripsi password admin:", err)
 		return
 	}
 
-	admin := models.User{
+	if result.Error == nil {
+		// Admin sudah ada, pastikan passwordnya admin123
+		admin.Password = string(hashedPassword)
+		database.DB.Save(&admin)
+		fmt.Println("✅ Password admin default (pokoknyaadmin@gmail.com) berhasil direset ke 'admin123'")
+		return
+	}
+
+	fmt.Println("🌱 Seeding default admin...")
+
+	admin = models.User{
 		FullName: "Kiaa Admin",
+		Username: "admin_kiaa",
 		Email:    "pokoknyaadmin@gmail.com",
 		Password: string(hashedPassword),
 		Role:     "admin",
@@ -399,6 +418,6 @@ func seedDefaultAdmin() {
 		fmt.Println("❌ Gagal seed default admin:", result.Error)
 		return
 	}
-	
+
 	fmt.Println("✅ Berhasil seed default admin (pokoknyaadmin@gmail.com)")
 }

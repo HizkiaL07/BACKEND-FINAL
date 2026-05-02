@@ -14,7 +14,10 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Explore Events — TicketWave" },
-      { name: "description", content: "Jelajahi konser dan event terbaik. Pesan tiket dengan seat locking real-time." },
+      {
+        name: "description",
+        content: "Jelajahi konser dan event terbaik. Pesan tiket dengan seat locking real-time.",
+      },
     ],
   }),
   component: HomePage,
@@ -22,15 +25,49 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const [q, setQ] = useState("");
-  const [events, setEvents] = useState<EventItem[]>(EVENTS);
+  const [events, setEvents] = useState<EventItem[]>([]);
 
   useEffect(() => {
-    setEvents(getAllEvents());
+    const fetchEvents = async () => {
+      try {
+        console.log("Fetching events from API...");
+        const res = await fetch("http://localhost:8080/api/events");
+        const json = await res.json();
+        console.log("API Response:", json);
+        if (json.success && Array.isArray(json.data)) {
+          const mapped = json.data.map((e: any) => ({
+            id: e.id.toString(),
+            dbId: e.id,
+            title: e.title,
+            artist: e.artist || e.description || "Artist",
+            genre: e.genre || "Concert",
+            date: new Date(e.event_date).toLocaleDateString("id-ID", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+            venue: e.location,
+            priceFrom: e.tickets?.[0]?.price || 100000,
+            rating: e.rating || 9.0,
+            poster: e.image_url || "linear-gradient(135deg,#0ea5e9,#a855f7,#ec4899)",
+            accent: "#22d3ee",
+          }));
+          console.log("Mapped Events:", mapped);
+          setEvents(mapped);
+        } else {
+          console.warn("API success but data is not an array or success is false");
+        }
+      } catch (err) {
+        console.error("Failed to fetch events", err);
+      }
+    };
+    fetchEvents();
   }, []);
 
   const filtered = useMemo(
-    () => events.filter((e) => (e.title + e.artist + e.genre).toLowerCase().includes(q.toLowerCase())),
-    [q, events]
+    () =>
+      events.filter((e) => (e.title + e.artist + e.genre).toLowerCase().includes(q.toLowerCase())),
+    [q, events],
   );
 
   return (
@@ -39,7 +76,7 @@ function HomePage() {
       <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <section className="mb-10">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
-            <span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> 48 EVENT AKTIF
+            <span className="h-2 w-2 rounded-full bg-primary animate-pulse" /> {events.length} EVENT AKTIF
           </div>
           <h1 className="mt-4 font-display text-4xl font-extrabold sm:text-5xl">
             JELAJAHI <span className="text-primary text-glow">EVENT</span>
@@ -64,7 +101,9 @@ function HomePage() {
             <EventCard key={e.id} ev={e} />
           ))}
           {filtered.length === 0 && (
-            <p className="col-span-full py-16 text-center text-muted-foreground">Tidak ada event yang cocok.</p>
+            <p className="col-span-full py-16 text-center text-muted-foreground">
+              Tidak ada event yang cocok.
+            </p>
           )}
         </section>
       </main>
@@ -72,10 +111,22 @@ function HomePage() {
   );
 }
 
-function EventCard({ ev }: { ev: typeof EVENTS[number] }) {
+const getPosterStyle = (poster: string) => {
+  if (poster.startsWith("http") || poster.startsWith("/") || poster.includes(".")) {
+    return { 
+      backgroundImage: `url(${poster})`, 
+      backgroundSize: 'cover', 
+      backgroundPosition: 'center' 
+    };
+  }
+  return { background: poster };
+};
+
+
+function EventCard({ ev }: { ev: (typeof EVENTS)[number] }) {
   return (
     <article className="group overflow-hidden rounded-2xl border border-border bg-card transition-all hover:-translate-y-1 hover:border-primary/60 hover:shadow-[var(--shadow-glow)]">
-      <div className="relative aspect-[4/5] overflow-hidden" style={{ background: ev.poster }}>
+      <div className="relative aspect-[4/5] overflow-hidden" style={getPosterStyle(ev.poster)}>
         <div className="absolute inset-0 bg-grid opacity-30 mix-blend-overlay" />
         <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">
           <Star className="h-3 w-3 fill-primary text-primary" /> {ev.rating}
