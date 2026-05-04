@@ -153,9 +153,9 @@ func CreateEvent(c *gin.Context) {
 			Mult  float64
 			Quota int
 		}{
-			{"VIP", 2.0, 100},
-			{"Premium", 1.5, 150},
 			{"Regular", 1.0, 200},
+			{"Premium", 1.0, 150},
+			{"VIP", 1.0, 100},
 		}
 
 		for _, cat := range categories {
